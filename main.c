@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
-typedef void (*RouteHandler)(int client_fd);
+typedef void (*RouteHandler)(int client_fd, const char *body, size_t body_len);
 
 typedef struct
 {
@@ -13,28 +13,44 @@ typedef struct
     RouteHandler handler;
 } Route;
 
-void handle_hello(int client_fd) {
+static void send_http_response(int client_fd,
+                               const char *status,
+                               const char *content_type,
+                               const char *body)
+{
+    char header[512];
+    int body_len = strlen(body);
+
+    int n = snprintf(header, sizeof(header),
+                     "HTTP/1.1 %s\r\n"
+                     "Content-Type: %s\r\n"
+                     "Content-Length: %d\r\n"
+                     "Connection: close\r\n"
+                     "\r\n",
+                     status, content_type, body_len);
+
+    send(client_fd, header, n, 0);
+    send(client_fd, body, body_len, 0);
+}
+
+void handle_hello(int client_fd, const char *body, size_t body_len)
+{
     const char *response = "Hello, World!";
-    send(client_fd, response, strlen(response), 0);
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", response);
 }
 
-void handle_health(int client_fd) {
+void handle_health(int client_fd, const char *body, size_t body_len)
+{
     const char *response = "Very healthy!";
-    send(client_fd, response, strlen(response), 0);
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", response);
 }
 
-void handle_data(int client_fd) {
-    char buffer[1024];
-    ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-    if (bytes_read < 0) {
-        perror("recv");
-        return;
-    }
-    buffer[bytes_read] = '\0'; // Null-terminate the buffer
-    printf("Received data: %s\n", buffer);
+void handle_data(int client_fd, const char *body, size_t body_len)
+{
+    printf("Received data (%zu bytes): %.*s\n", body_len, (int)body_len, body ? body : "");
 
     const char *response = "Data received!";
-    send(client_fd, response, strlen(response), 0);
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", response);
 }
 
 Route routes[] = {
@@ -45,25 +61,32 @@ Route routes[] = {
 };
 const int route_count = 3; // Exclude the NULL entry
 
-void dispatch_request(int client_fd, const char *method, const char *path) {
+void dispatch_request(int client_fd, const char *method, const char *path)
+{
     int path_matched = 0;
 
-    for (int i = 0; i < route_count; i++) {
-        if (strcmp(routes[i].method, method) == 0) {
+    for (int i = 0; i < route_count; i++)
+    {
+        if (strcmp(routes[i].method, method) == 0)
+        {
             path_matched = 1;
-            if (strcmp(routes[i].path, path) == 0) {
-                routes[i].handler(client_fd);
+            if (strcmp(routes[i].path, path) == 0)
+            {
+                routes[i].handler(client_fd, NULL, 0);
                 return;
             }
         }
     }
 
-    if (path_matched) {
+    if (path_matched)
+    {
         const char *response = "405 Method Not Allowed";
-        send(client_fd, response, strlen(response), 0);
-    } else {
+        send_http_response(client_fd, "405 Method Not Allowed", "text/plain; charset=utf-8", response);
+    }
+    else
+    {
         const char *response = "404 Not Found";
-        send(client_fd, response, strlen(response), 0);
+        send_http_response(client_fd, "404 Not Found", "text/plain; charset=utf-8", response);
     }
 }
 
@@ -101,7 +124,7 @@ int main(void)
         return 1;
     }
 
-    printf("Server is listening on port 8081...\n");
+    printf("Server is listening on port 8080...\n");
 
     while (1)
     {
@@ -129,9 +152,10 @@ int main(void)
 
         char method[16], path[256];
         int parsed = sscanf(buffer, "%15s %255s", method, path);
-        if (parsed != 2) {
+        if (parsed != 2)
+        {
             const char *response = "400 Bad Request";
-            send(client_fd, response, strlen(response), 0);
+            send_http_response(client_fd, "400 Bad Request", "text/plain; charset=utf-8", response);
             close(client_fd);
             continue;
         }
