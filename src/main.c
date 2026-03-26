@@ -63,9 +63,12 @@ int main(void)
         }
 
         buffer[bytes_read] = '\0'; // Null-terminate the buffer
-        printf("Received from client: %s\n", buffer);
+        printf("Received from client (%zd bytes):\n", bytes_read);
+        fwrite(buffer, 1, (size_t)bytes_read, stdout);
+        printf("\n");
 
         char method[16], path[256];
+        
         int parsed = sscanf(buffer, "%15s %255s", method, path);
         if (parsed != 2)
         {
