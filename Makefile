@@ -1,7 +1,7 @@
 CC := cc
 CFLAGS := -Wall -Wextra -Wpedantic -std=c11
 TARGET := hello
-SRC := main.c
+SRC := src/main.c src/tcp.c src/routes.c
 
 .PHONY: all clean run
 

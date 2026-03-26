@@ -1,0 +1,12 @@
+[
+  {
+    "directory": "/home/tobias/Documents/git/MicroHTTP",
+    "command": "cc -Wall -Wextra -Wpedantic -std=c11 -c src/main.c -o src/main.o",
+    "file": "src/main.c"
+  },
+  {
+    "directory": "/home/tobias/Documents/git/MicroHTTP",
+    "command": "cc -Wall -Wextra -Wpedantic -std=c11 -c src/tcp.c -o src/tcp.o",
+    "file": "src/tcp.c"
+  }
+]

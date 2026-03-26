@@ -8,7 +8,7 @@ http:
   url: http://localhost:8080/data
   body:
     type: text
-    data: hello
+    data: hellos
   auth: inherit
 
 settings:

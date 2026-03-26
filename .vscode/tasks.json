@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build (make)",
+      "type": "shell",
+      "command": "make",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "Clean (make)",
+      "type": "shell",
+      "command": "make clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "Build Watch (auto)",
+      "type": "shell",
+      "command": "sh",
+      "args": [
+        "-c",
+        "last=''; while true; do cur=$(find src -type f \\( -name '*.c' -o -name '*.h' \\) -printf '%T@ %p\\n' | sort | sha1sum); if [ \"$cur\" != \"$last\" ]; then last=\"$cur\"; echo '[[WATCH-BUILD-START]]'; make -B --no-print-directory; echo '[[WATCH-BUILD-END]]'; fi; sleep 1; done"
+      ],
+      "isBackground": true,
+      "problemMatcher": [
+        {
+          "base": "$gcc",
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "^\\[\\[WATCH-BUILD-START\\]\\]$",
+            "endsPattern": "^\\[\\[WATCH-BUILD-END\\]\\]$"
+          }
+        }
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    }
+  ]
+}
