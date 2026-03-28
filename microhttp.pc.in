@@ -1,0 +1,10 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+libdir=@LIBDIR@
+includedir=@INCLUDEDIR@
+
+Name: microhttp
+Description: Minimal HTTP server library in C
+Version: @VERSION@
+Libs: -L${libdir} -lmicrohttp
+Cflags: -I${includedir}

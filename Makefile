@@ -10,6 +10,7 @@ LDLIBS ?=
 PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR ?= $(PREFIX)/include
+PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
 
 VERSION ?= 0.1.0
 SOVERSION ?= 0
@@ -22,13 +23,14 @@ STATIC_LIB := lib$(LIB_NAME).a
 REAL_SHARED_LIB := lib$(LIB_NAME).so.$(VERSION)
 SONAME_LIB := lib$(LIB_NAME).so.$(SOVERSION)
 LINK_SHARED_LIB := lib$(LIB_NAME).so
+PKGCONFIG_FILE := $(LIB_NAME).pc
 
 DEMO_TARGET := hello
 DEMO_SRC := example/main.c
 
 .PHONY: all clean demo run install uninstall
 
-all: $(STATIC_LIB) $(REAL_SHARED_LIB) $(SONAME_LIB) $(LINK_SHARED_LIB)
+all: $(STATIC_LIB) $(REAL_SHARED_LIB) $(SONAME_LIB) $(LINK_SHARED_LIB) $(PKGCONFIG_FILE)
 
 $(LIB_OBJ): %.o: %.c include/microhttp.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $< -o $@
@@ -46,6 +48,14 @@ $(SONAME_LIB): $(REAL_SHARED_LIB)
 $(LINK_SHARED_LIB): $(SONAME_LIB)
 	ln -sf $< $@
 
+$(PKGCONFIG_FILE): microhttp.pc.in Makefile
+	sed \
+		-e 's|@PREFIX@|$(PREFIX)|g' \
+		-e 's|@LIBDIR@|$(LIBDIR)|g' \
+		-e 's|@INCLUDEDIR@|$(INCLUDEDIR)|g' \
+		-e 's|@VERSION@|$(VERSION)|g' \
+		$< > $@
+
 demo: $(DEMO_TARGET)
 
 $(DEMO_TARGET): $(DEMO_SRC) $(LINK_SHARED_LIB)
@@ -57,9 +67,11 @@ run: demo
 install: all
 	install -d $(DESTDIR)$(INCLUDEDIR)
 	install -d $(DESTDIR)$(LIBDIR)
+	install -d $(DESTDIR)$(PKGCONFIGDIR)
 	install -m 644 include/microhttp.h $(DESTDIR)$(INCLUDEDIR)/microhttp.h
 	install -m 644 $(STATIC_LIB) $(DESTDIR)$(LIBDIR)/$(STATIC_LIB)
 	install -m 755 $(REAL_SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(REAL_SHARED_LIB)
+	install -m 644 $(PKGCONFIG_FILE) $(DESTDIR)$(PKGCONFIGDIR)/$(PKGCONFIG_FILE)
 	ln -sf $(REAL_SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(SONAME_LIB)
 	ln -sf $(SONAME_LIB) $(DESTDIR)$(LIBDIR)/$(LINK_SHARED_LIB)
 
@@ -69,6 +81,7 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/$(LINK_SHARED_LIB)
 	rm -f $(DESTDIR)$(LIBDIR)/$(SONAME_LIB)
 	rm -f $(DESTDIR)$(LIBDIR)/$(REAL_SHARED_LIB)
+	rm -f $(DESTDIR)$(PKGCONFIGDIR)/$(PKGCONFIG_FILE)
 
 clean:
-	rm -f $(LIB_OBJ) $(STATIC_LIB) $(LINK_SHARED_LIB) $(SONAME_LIB) $(REAL_SHARED_LIB) $(DEMO_TARGET)
+	rm -f $(LIB_OBJ) $(STATIC_LIB) $(LINK_SHARED_LIB) $(SONAME_LIB) $(REAL_SHARED_LIB) $(PKGCONFIG_FILE) $(DEMO_TARGET)
