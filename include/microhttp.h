@@ -21,4 +21,6 @@ void dispatch_request(int client_fd, const char *method, const char *path);
 
 void register_routes(const route_handler *routes, size_t num_routes);
 
+int microhttp_serve(unsigned short port);
+
 #endif
