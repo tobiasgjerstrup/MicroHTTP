@@ -1,10 +1,10 @@
-#include "tcp.h"
+#include "microhttp.h"
 #include <stdio.h>
-// #include <stdlib.h>
 #include <string.h>
-// #include <unistd.h>
 #include <arpa/inet.h>
-#include "routes.h"
+
+static const route_handler *registered_routes = NULL;
+static size_t registered_route_count = 0;
 
 void send_http_response(int client_fd,
                                const char *status,
@@ -26,35 +26,24 @@ void send_http_response(int client_fd,
     send(client_fd, body, body_len, 0);
 }
 
-typedef void (*RouteHandler)(int client_fd, const char *body, size_t body_len);
-
-typedef struct
+void register_routes(const route_handler *routes, size_t num_routes)
 {
-    const char *method;
-    const char *path;
-    RouteHandler handler;
-} Route;
-
-Route routes[] = {
-    {"GET", "/hello", handle_hello},
-    {"GET", "/health", handle_health},
-    {"POST", "/data", handle_data},
-    {NULL, NULL, NULL} // End of routes
-};
-const int route_count = 3; // Exclude the NULL entry
+    registered_routes = routes;
+    registered_route_count = num_routes;
+}
 
 void dispatch_request(int client_fd, const char *method, const char *path)
 {
     int path_matched = 0;
 
-    for (int i = 0; i < route_count; i++)
+    for (size_t i = 0; i < registered_route_count; i++)
     {
-        if (strcmp(routes[i].method, method) == 0)
+        if (strcmp(registered_routes[i].path, path) == 0)
         {
             path_matched = 1;
-            if (strcmp(routes[i].path, path) == 0)
+            if (strcmp(registered_routes[i].method, method) == 0)
             {
-                routes[i].handler(client_fd, NULL, 0);
+                registered_routes[i].handler(client_fd, NULL, 0);
                 return;
             }
         }

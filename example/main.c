@@ -1,9 +1,30 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "tcp.h"
+#include "microhttp.h"
+
+static void handle_hello(int client_fd, const char *body, size_t body_len)
+{
+    (void)body;
+    (void)body_len;
+
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", "Hello, world!");
+}
+
+static void handle_health(int client_fd, const char *body, size_t body_len)
+{
+    (void)body;
+    (void)body_len;
+
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", "Very healthy!");
+}
+
+static void handle_data(int client_fd, const char *body, size_t body_len)
+{
+    printf("Received data (%zu bytes): %.*s\n", body_len, (int)body_len, body ? body : "");
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", "Data received!");
+}
 
 int main(void)
 {
@@ -11,8 +32,14 @@ int main(void)
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
     char buffer[1024];
+    const route_handler routes[] = {
+        {"GET", "/hello", handle_hello},
+        {"GET", "/health", handle_health},
+        {"POST", "/data", handle_data},
+    };
 
-    // Create socket
+    register_routes(routes, sizeof(routes) / sizeof(routes[0]));
+
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0)
     {
@@ -20,19 +47,16 @@ int main(void)
         return 1;
     }
 
-    // Set up server address
-    server_addr.sin_family = AF_INET;         // IPv4
-    server_addr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(8080);
 
-    // Bind socket
     if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("bind");
         return 1;
     }
 
-    // Listen for connections
     if (listen(server_fd, 5) < 0)
     {
         perror("listen");
@@ -43,7 +67,6 @@ int main(void)
 
     while (1)
     {
-        // Accept a client connection
         client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
         if (client_fd < 0)
         {
@@ -51,9 +74,6 @@ int main(void)
             continue;
         }
 
-        printf("Client connected: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-
-        // Read data from the client
         ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
         if (bytes_read < 0)
         {
@@ -62,13 +82,9 @@ int main(void)
             continue;
         }
 
-        buffer[bytes_read] = '\0'; // Null-terminate the buffer
-        printf("Received from client (%zd bytes):\n", bytes_read);
-        fwrite(buffer, 1, (size_t)bytes_read, stdout);
-        printf("\n");
+        buffer[bytes_read] = '\0';
 
         char method[16], path[256];
-        
         int parsed = sscanf(buffer, "%15s %255s", method, path);
         if (parsed != 2)
         {
@@ -80,7 +96,6 @@ int main(void)
 
         dispatch_request(client_fd, method, path);
 
-        // Close the client connection
         close(client_fd);
     }
 
