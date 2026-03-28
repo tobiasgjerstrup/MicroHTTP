@@ -11,6 +11,7 @@ PREFIX ?= /usr/local
 LIBDIR ?= $(PREFIX)/lib
 INCLUDEDIR ?= $(PREFIX)/include
 PKGCONFIGDIR ?= $(LIBDIR)/pkgconfig
+CMAKEPKGDIR ?= $(LIBDIR)/cmake/MicroHTTP
 
 VERSION ?= 0.1.0
 SOVERSION ?= 0
@@ -24,13 +25,15 @@ REAL_SHARED_LIB := lib$(LIB_NAME).so.$(VERSION)
 SONAME_LIB := lib$(LIB_NAME).so.$(SOVERSION)
 LINK_SHARED_LIB := lib$(LIB_NAME).so
 PKGCONFIG_FILE := $(LIB_NAME).pc
+CMAKE_CONFIG_FILE := MicroHTTPConfig.cmake
+CMAKE_CONFIG_VERSION_FILE := MicroHTTPConfigVersion.cmake
 
 DEMO_TARGET := hello
 DEMO_SRC := example/main.c
 
 .PHONY: all clean demo run install uninstall
 
-all: $(STATIC_LIB) $(REAL_SHARED_LIB) $(SONAME_LIB) $(LINK_SHARED_LIB) $(PKGCONFIG_FILE)
+all: $(STATIC_LIB) $(REAL_SHARED_LIB) $(SONAME_LIB) $(LINK_SHARED_LIB) $(PKGCONFIG_FILE) $(CMAKE_CONFIG_FILE) $(CMAKE_CONFIG_VERSION_FILE)
 
 $(LIB_OBJ): %.o: %.c include/microhttp.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -fPIC -c $< -o $@
@@ -56,6 +59,16 @@ $(PKGCONFIG_FILE): microhttp.pc.in Makefile
 		-e 's|@VERSION@|$(VERSION)|g' \
 		$< > $@
 
+$(CMAKE_CONFIG_FILE): cmake/MicroHTTPConfig.cmake.in Makefile
+	sed \
+		-e 's|@VERSION@|$(VERSION)|g' \
+		$< > $@
+
+$(CMAKE_CONFIG_VERSION_FILE): cmake/MicroHTTPConfigVersion.cmake.in Makefile
+	sed \
+		-e 's|@VERSION@|$(VERSION)|g' \
+		$< > $@
+
 demo: $(DEMO_TARGET)
 
 $(DEMO_TARGET): $(DEMO_SRC) $(LINK_SHARED_LIB)
@@ -68,10 +81,13 @@ install: all
 	install -d $(DESTDIR)$(INCLUDEDIR)
 	install -d $(DESTDIR)$(LIBDIR)
 	install -d $(DESTDIR)$(PKGCONFIGDIR)
+	install -d $(DESTDIR)$(CMAKEPKGDIR)
 	install -m 644 include/microhttp.h $(DESTDIR)$(INCLUDEDIR)/microhttp.h
 	install -m 644 $(STATIC_LIB) $(DESTDIR)$(LIBDIR)/$(STATIC_LIB)
 	install -m 755 $(REAL_SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(REAL_SHARED_LIB)
 	install -m 644 $(PKGCONFIG_FILE) $(DESTDIR)$(PKGCONFIGDIR)/$(PKGCONFIG_FILE)
+	install -m 644 $(CMAKE_CONFIG_FILE) $(DESTDIR)$(CMAKEPKGDIR)/$(CMAKE_CONFIG_FILE)
+	install -m 644 $(CMAKE_CONFIG_VERSION_FILE) $(DESTDIR)$(CMAKEPKGDIR)/$(CMAKE_CONFIG_VERSION_FILE)
 	ln -sf $(REAL_SHARED_LIB) $(DESTDIR)$(LIBDIR)/$(SONAME_LIB)
 	ln -sf $(SONAME_LIB) $(DESTDIR)$(LIBDIR)/$(LINK_SHARED_LIB)
 
@@ -82,6 +98,8 @@ uninstall:
 	rm -f $(DESTDIR)$(LIBDIR)/$(SONAME_LIB)
 	rm -f $(DESTDIR)$(LIBDIR)/$(REAL_SHARED_LIB)
 	rm -f $(DESTDIR)$(PKGCONFIGDIR)/$(PKGCONFIG_FILE)
+	rm -f $(DESTDIR)$(CMAKEPKGDIR)/$(CMAKE_CONFIG_FILE)
+	rm -f $(DESTDIR)$(CMAKEPKGDIR)/$(CMAKE_CONFIG_VERSION_FILE)
 
 clean:
-	rm -f $(LIB_OBJ) $(STATIC_LIB) $(LINK_SHARED_LIB) $(SONAME_LIB) $(REAL_SHARED_LIB) $(PKGCONFIG_FILE) $(DEMO_TARGET)
+	rm -f $(LIB_OBJ) $(STATIC_LIB) $(LINK_SHARED_LIB) $(SONAME_LIB) $(REAL_SHARED_LIB) $(PKGCONFIG_FILE) $(CMAKE_CONFIG_FILE) $(CMAKE_CONFIG_VERSION_FILE) $(DEMO_TARGET)

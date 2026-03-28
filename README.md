@@ -90,6 +90,33 @@ If the package is installed into a non-standard prefix, point `pkg-config` at th
 export PKG_CONFIG_PATH=/custom/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
 ```
 
+### CMake find_package (Config Mode)
+
+MicroHTTP installs CMake package metadata so consumers can use `find_package`.
+
+Example `CMakeLists.txt`:
+
+```cmake
+cmake_minimum_required(VERSION 3.15)
+project(consumer C)
+
+find_package(MicroHTTP CONFIG REQUIRED)
+
+add_executable(consumer_app app.c)
+target_link_libraries(consumer_app PRIVATE MicroHTTP::microhttp)
+```
+
+If MicroHTTP is installed into a non-standard prefix, configure your project with:
+
+```sh
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/custom/prefix
+```
+
+Installed CMake package files:
+
+- `lib/cmake/MicroHTTP/MicroHTTPConfig.cmake`
+- `lib/cmake/MicroHTTP/MicroHTTPConfigVersion.cmake`
+
 ## Minimal Example
 
 ```c
