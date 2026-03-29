@@ -1,8 +1,12 @@
 #include "microhttp.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+
+#define MAX_REQUEST_SIZE (64 * 1024)
 
 static const route_handler *registered_routes = NULL;
 static size_t registered_route_count = 0;
@@ -33,7 +37,47 @@ void register_routes(const route_handler *routes, size_t num_routes)
     registered_route_count = num_routes;
 }
 
-void dispatch_request(int client_fd, const char *method, const char *path)
+static size_t parse_content_length(const char *headers)
+{
+    const char *line = headers;
+
+    while (line && *line)
+    {
+        const char *line_end = strstr(line, "\r\n");
+        size_t line_len;
+
+        if (!line_end)
+        {
+            break;
+        }
+
+        line_len = (size_t)(line_end - line);
+        if (line_len == 0)
+        {
+            break;
+        }
+
+        if (line_len > 15 && strncasecmp(line, "Content-Length:", 15) == 0)
+        {
+            const char *value = line + 15;
+            while (*value == ' ' || *value == '\t')
+            {
+                value++;
+            }
+            return (size_t)strtoul(value, NULL, 10);
+        }
+
+        line = line_end + 2;
+    }
+
+    return 0;
+}
+
+void dispatch_request(int client_fd,
+                      const char *method,
+                      const char *path,
+                      const char *body,
+                      size_t body_len)
 {
     int path_matched = 0;
 
@@ -44,7 +88,7 @@ void dispatch_request(int client_fd, const char *method, const char *path)
             path_matched = 1;
             if (strcmp(registered_routes[i].method, method) == 0)
             {
-                registered_routes[i].handler(client_fd, NULL, 0);
+                registered_routes[i].handler(client_fd, body, body_len);
                 return;
             }
         }
@@ -67,7 +111,13 @@ int microhttp_serve(unsigned short port)
     int server_fd, client_fd;
     struct sockaddr_in server_addr, client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
-    char buffer[1024];
+    char *buffer = malloc(MAX_REQUEST_SIZE + 1);
+
+    if (!buffer)
+    {
+        perror("malloc");
+        return 1;
+    }
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0)
@@ -105,15 +155,70 @@ int microhttp_serve(unsigned short port)
             continue;
         }
 
-        ssize_t bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-        if (bytes_read < 0)
+        size_t total_read = 0;
+        size_t content_length = 0;
+        size_t header_len = 0;
+        const char *body = NULL;
+        size_t body_len = 0;
+        int headers_ready = 0;
+
+        while (total_read < MAX_REQUEST_SIZE)
         {
-            perror("recv");
-            close(client_fd);
-            continue;
+            ssize_t bytes_read = recv(client_fd,
+                                      buffer + total_read,
+                                      MAX_REQUEST_SIZE - total_read,
+                                      0);
+
+            if (bytes_read < 0)
+            {
+                perror("recv");
+                close(client_fd);
+                goto next_client;
+            }
+
+            if (bytes_read == 0)
+            {
+                break;
+            }
+
+            total_read += (size_t)bytes_read;
+            buffer[total_read] = '\0';
+
+            if (!headers_ready)
+            {
+                char *header_end = strstr(buffer, "\r\n\r\n");
+                if (!header_end)
+                {
+                    continue;
+                }
+
+                headers_ready = 1;
+                header_len = (size_t)(header_end - buffer) + 4;
+                content_length = parse_content_length(buffer);
+            }
+
+            if (headers_ready && total_read >= header_len + content_length)
+            {
+                break;
+            }
         }
 
-        buffer[bytes_read] = '\0';
+        if (!headers_ready)
+        {
+            send_http_response(client_fd, "400 Bad Request", "text/plain; charset=utf-8", "400 Bad Request");
+            close(client_fd);
+            goto next_client;
+        }
+
+        if (total_read < header_len + content_length)
+        {
+            send_http_response(client_fd, "400 Bad Request", "text/plain; charset=utf-8", "Incomplete Request Body");
+            close(client_fd);
+            goto next_client;
+        }
+
+        body = buffer + header_len;
+        body_len = content_length;
 
         char method[16], path[256];
         int parsed = sscanf(buffer, "%15s %255s", method, path);
@@ -121,13 +226,17 @@ int microhttp_serve(unsigned short port)
         {
             send_http_response(client_fd, "400 Bad Request", "text/plain; charset=utf-8", "400 Bad Request");
             close(client_fd);
-            continue;
+            goto next_client;
         }
 
-        dispatch_request(client_fd, method, path);
+        dispatch_request(client_fd, method, path, body, body_len);
         close(client_fd);
+
+    next_client:
+        ;
     }
 
+    free(buffer);
     close(server_fd);
     return 0;
 }
