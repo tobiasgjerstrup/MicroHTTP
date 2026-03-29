@@ -141,12 +141,24 @@ JsonToken next_token(JsonLexer *lx) {
             if (isdigit((unsigned char)c)) {
                 return lex_number(lx, lx->pos - 1);
             }
-            lx->pos--; /* put back first char of keyword */
-            if (match_word(lx, "true"))  return make_token(TOK_TRUE, NULL);
-            lx->pos--;
-            if (match_word(lx, "false")) return make_token(TOK_FALSE, NULL);
-            lx->pos--;
-            if (match_word(lx, "null"))  return make_token(TOK_NULL, NULL);
+            {
+                size_t keyword_start = lx->pos - 1;
+
+                lx->pos = keyword_start;
+                if (match_word(lx, "true")) {
+                    return make_token(TOK_TRUE, NULL);
+                }
+
+                lx->pos = keyword_start;
+                if (match_word(lx, "false")) {
+                    return make_token(TOK_FALSE, NULL);
+                }
+
+                lx->pos = keyword_start;
+                if (match_word(lx, "null")) {
+                    return make_token(TOK_NULL, NULL);
+                }
+            }
             return error_token();
     }
 }
