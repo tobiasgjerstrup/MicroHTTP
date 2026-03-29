@@ -17,7 +17,7 @@ VERSION ?= 0.1.0
 SOVERSION ?= 0
 
 LIB_NAME := microhttp
-LIB_SRC := src/tcp.c
+LIB_SRC := src/tcp.c src/json.c
 LIB_OBJ := $(LIB_SRC:.c=.o)
 
 STATIC_LIB := lib$(LIB_NAME).a

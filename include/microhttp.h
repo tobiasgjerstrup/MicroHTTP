@@ -23,4 +23,6 @@ void register_routes(const route_handler *routes, size_t num_routes);
 
 int microhttp_serve(unsigned short port);
 
+void test_parse_person(void);
+
 #endif

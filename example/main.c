@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "microhttp.h"
 
 static void handle_hello(int client_fd, const char *body, size_t body_len)
@@ -25,6 +26,9 @@ static void handle_data(int client_fd, const char *body, size_t body_len)
 
 int main(void)
 {
+    test_parse_person();
+    exit(0);
+
     const route_handler routes[] = {
         {"GET", "/hello", handle_hello},
         {"GET", "/health", handle_health},
