@@ -1,0 +1,24 @@
+info:
+  name: JSON
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: http://localhost:8080/json
+  body:
+    type: json
+    data: |-
+      {
+        "age": 25,
+        "name": "Tobias",
+        "gender": "Man",
+        "active": true
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
