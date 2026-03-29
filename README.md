@@ -2,6 +2,11 @@
 
 MicroHTTP is a small C library for serving HTTP requests with a route table and callback handlers.
 
+It includes a small JSON parser that can either:
+
+- validate arbitrary JSON input
+- map JSON object fields into a C struct via field specs
+
 ## Build
 
 Build the library artifacts:
@@ -130,10 +135,18 @@ static void handle_hello(int client_fd, const char *body, size_t body_len)
     send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", "Hello, world!");
 }
 
+static void handle_echo_body(int client_fd, const char *body, size_t body_len)
+{
+    char response[256];
+    snprintf(response, sizeof(response), "received %zu bytes", body_len);
+    send_http_response(client_fd, "200 OK", "text/plain; charset=utf-8", response);
+}
+
 int main(void)
 {
     const route_handler routes[] = {
         {"GET", "/hello", handle_hello},
+        {"POST", "/echo", handle_echo_body},
     };
 
     register_routes(routes, sizeof(routes) / sizeof(routes[0]));
@@ -152,10 +165,75 @@ cc app.c $(pkg-config --cflags --libs microhttp) -o app
 The public header is in `include/microhttp.h` and currently exposes:
 
 - `route_handler`
+- `JsonFieldType`
+- `JsonFieldSpec`
 - `register_routes`
 - `dispatch_request`
 - `send_http_response`
 - `microhttp_serve`
+- `parse_json`
+
+## JSON Parsing
+
+`parse_json` supports two modes:
+
+1. Validation-only: pass `NULL` for `out_struct` and `fields` and `0` for `field_count`.
+2. Struct mapping: pass an output struct pointer and a `JsonFieldSpec` array.
+
+Function signature:
+
+```c
+int parse_json(const char *json,
+               void *out_struct,
+               const JsonFieldSpec *fields,
+               size_t field_count,
+               const char **error_out);
+```
+
+Example mapping JSON into a struct:
+
+```c
+#include <stddef.h>
+#include <stdio.h>
+#include "microhttp.h"
+
+typedef struct {
+    char name[64];
+    int age;
+    char gender[32];
+    int active;
+} UserProfile;
+
+int main(void)
+{
+    const char *json = "{\"name\":\"Tobias\",\"age\":25,\"gender\":\"man\",\"active\":true}";
+    const char *error = NULL;
+    UserProfile user = {0};
+
+    const JsonFieldSpec fields[] = {
+        {"name", JSON_FIELD_STRING, offsetof(UserProfile, name), sizeof(user.name), 1},
+        {"age", JSON_FIELD_INT, offsetof(UserProfile, age), 0, 1},
+        {"gender", JSON_FIELD_STRING, offsetof(UserProfile, gender), sizeof(user.gender), 1},
+        {"active", JSON_FIELD_BOOL, offsetof(UserProfile, active), 0, 0},
+    };
+
+    if (parse_json(json, &user, fields, sizeof(fields) / sizeof(fields[0]), &error)) {
+        printf("name=%s age=%d gender=%s active=%d\n", user.name, user.age, user.gender, user.active);
+    } else {
+        printf("parse error: %s\n", error ? error : "unknown error");
+    }
+
+    return 0;
+}
+```
+
+Quick test against the example server:
+
+```sh
+curl -i -X POST http://localhost:8080/json \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Tobias","age":25,"gender":"man","active":true}'
+```
 
 ## Notes
 
